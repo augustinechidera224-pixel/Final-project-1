@@ -36,7 +36,18 @@
 
 ### S04: As an organizer, I want to publish and unpublish an event, so that I control when it goes public
 
-*Written by you, in pairs, during the Build 2 class. Add your three criteria here before you paste the AI prompt below.*
+- **Given** a draft event that exists
+  **When** the organizer publishes the event
+  **Then** the event's status changes to PUBLISHED and it becomes visible on the public event list.
+
+- **Given** a published event
+  **When** the organizer unpublishes the event
+  **Then** the event's status changes to DRAFT and it is removed from the public event list.
+
+- **Given** an event ID that does not exist
+  **When** the organizer attempts to publish or unpublish the event
+  **Then** the request is rejected with `NOT_FOUND` and nothing changes.
+
 
 ### S05: As an attendee, I want to search, filter and sort published events, so that I can find one I like
 

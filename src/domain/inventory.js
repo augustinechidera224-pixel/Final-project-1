@@ -58,6 +58,15 @@ function requireWholeNumber(value, field, min) {
   return value;
 }
 
+function isValidIsoDate(value) {
+  if (value instanceof Date) return !Number.isNaN(value.getTime());
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{4}-\d{2}-\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/.exec(value);
+  if (!match) return false;
+  const datePart = new Date(`${match[1]}T00:00:00.000Z`);
+  return !Number.isNaN(datePart.getTime()) && datePart.toISOString().slice(0, 10) === match[1];
+}
+
 function getTier(store, tierId) {
   assertStore(store);
   const id = requireText(tierId, 'Tier ID');
@@ -87,7 +96,7 @@ export function createEvent(store, input) {
     throw new DomainError('VALIDATION', 'Venue must be a string');
   }
   if (organizerId !== undefined) requireText(organizerId, 'Organizer ID');
-  if (!(typeof startsAt === 'string' || startsAt instanceof Date)) {
+  if (!(typeof startsAt === 'string' || startsAt instanceof Date) || !isValidIsoDate(startsAt)) {
     throw new DomainError('VALIDATION', 'startsAt must be a valid date');
   }
   const date = new Date(startsAt);
@@ -134,6 +143,13 @@ export function publishEvent(store, eventId) {
     throw new DomainError('INVALID_STATE', 'Add at least one ticket tier before publishing');
   }
   event.status = 'published';
+  return event;
+}
+
+export function unpublishEvent(store, eventId) {
+  assertStore(store);
+  const event = getEvent(store, eventId);
+  event.status = 'draft';
   return event;
 }
 

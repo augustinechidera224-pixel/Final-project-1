@@ -13,9 +13,9 @@ Every time you give an AI tool a significant prompt, add an entry. Three lines e
 ## Build 2
 
 ### Prompt 1: Build 2 prompt (docs/build-2.md)
-- **What I asked:**
-- **What came back:**
-- **What was wrong (or "nothing"):**
+- **What I asked:** Implement Build 2 sorting, search/filter, publishing behavior and acceptance tests.
+- **What came back:** Merge sort, event search, event summaries, and the npm test script were already present. The S04 unpublish operation and several acceptance-criterion assertions were missing.
+- **What was wrong (or "nothing"):** Added unpublishing, strict ISO date and criteria validation, and tests for missing event/tier errors, published visibility, stable and non-mutating sorting/filtering, empty lists, date boundaries, and all specified error codes.
 
 ### Prompt 2:
 - **What I asked:**

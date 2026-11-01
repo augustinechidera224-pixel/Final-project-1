@@ -12,6 +12,8 @@ import { filterEvents, sortEvents, searchEvents } from '../src/domain/eventSearc
 import { DomainError } from '../src/domain/errors.js';
 
 const titles = (events) => events.map((e) => e.title);
+const throwsCode = (fn, code) =>
+  assert.throws(fn, (error) => error instanceof DomainError && error.code === code);
 
 describe('event search', () => {
   let summaries;
@@ -59,6 +61,7 @@ describe('event search', () => {
     });
 
     it('by text in the title or venue', () => {
+      assert.deepEqual(titles(filterEvents(summaries, { q: 'JAZZ' })), ['Jazz Night']);
       assert.deepEqual(titles(filterEvents(summaries, { q: 'summit' })), ['Tech Summit']);
       assert.deepEqual(titles(filterEvents(summaries, { q: 'ibadan hall' })), ['Sold Out Gig']);
     });
@@ -66,11 +69,26 @@ describe('event search', () => {
     it('by maximum price, including free events', () => {
       assert.deepEqual(titles(filterEvents(summaries, { maxPriceCents: 3000 })).sort(), ['Food Fair', 'Jazz Night']);
       assert.deepEqual(titles(filterEvents(summaries, { maxPriceCents: 0 })), ['Food Fair']);
+      const noTier = { ...summaries[0], title: 'No Tier', minPriceCents: null };
+      assert.equal(filterEvents([...summaries, noTier], { maxPriceCents: 3000 }).includes(noTier), false);
     });
 
     it('by date range, where a date-only "to" includes the whole day', () => {
       const result = filterEvents(summaries, { from: '2026-12-05', to: '2026-12-05' });
       assert.deepEqual(titles(result).sort(), ['Food Fair', 'Tech Summit']);
+      const eventAtFive = {
+        ...summaries[0],
+        title: 'Five PM Event',
+        startsAt: '2026-12-05T17:00:00Z',
+      };
+      assert.equal(
+        titles(filterEvents([...summaries, eventAtFive], { to: '2026-12-05' })).includes('Five PM Event'),
+        true,
+      );
+      assert.deepEqual(
+        titles(filterEvents(summaries, { from: '2026-12-10T19:00:00Z' })),
+        ['Jazz Night', 'Sold Out Gig'],
+      );
     });
 
     it('can hide sold-out events', () => {
@@ -78,8 +96,12 @@ describe('event search', () => {
     });
 
     it('rejects nonsense input', () => {
-      assert.throws(() => filterEvents(summaries, { from: 'yesterday-ish' }), DomainError);
-      assert.throws(() => filterEvents(summaries, { maxPriceCents: -5 }), DomainError);
+      throwsCode(() => filterEvents(summaries, { from: 'yesterday-ish' }), 'VALIDATION');
+      throwsCode(() => filterEvents(summaries, { from: '2026-02-30' }), 'VALIDATION');
+      throwsCode(() => filterEvents(summaries, { maxPriceCents: 1.5 }), 'VALIDATION');
+      throwsCode(() => filterEvents(summaries, { maxPriceCents: -5 }), 'VALIDATION');
+      throwsCode(() => filterEvents(summaries, null), 'VALIDATION');
+      throwsCode(() => filterEvents(summaries, { q: 5 }), 'VALIDATION');
     });
   });
 
@@ -102,15 +124,54 @@ describe('event search', () => {
     });
 
     it('does not change the input and rejects unknown sort keys', () => {
-      const before = titles(summaries);
+      const before = structuredClone(summaries);
       sortEvents(summaries, 'price');
-      assert.deepEqual(titles(summaries), before);
-      assert.throws(() => sortEvents(summaries, 'constructor'), DomainError);
+      assert.deepEqual(summaries, before);
+      throwsCode(() => sortEvents(summaries, 'constructor'), 'VALIDATION');
+    });
+
+    it('breaks equal sort keys by title then id', () => {
+      const events = [
+        { id: 'b', title: 'Bravo', startsAt: '2026-12-05T12:00:00Z', minPriceCents: 10, seatsLeft: 2 },
+        { id: 'z', title: 'Alpha', startsAt: '2026-12-05T12:00:00Z', minPriceCents: 10, seatsLeft: 2 },
+        { id: 'a', title: 'Alpha', startsAt: '2026-12-05T12:00:00Z', minPriceCents: 10, seatsLeft: 2 },
+      ];
+      assert.deepEqual(sortEvents(events).map((event) => event.id), ['a', 'z', 'b']);
+    });
+
+    it('returns a new stable result for empty lists and equivalent sort keys', () => {
+      const empty = [];
+      assert.deepEqual(sortEvents(empty), []);
+      assert.notEqual(sortEvents(empty), empty);
+      assert.deepEqual(filterEvents(empty), []);
+      assert.deepEqual(searchEvents(empty), []);
+
+      const equalKeyEvents = [
+        { id: 'same', title: 'Same', startsAt: '2026-12-05T12:00:00Z', minPriceCents: 10, seatsLeft: 1, order: 1 },
+        { id: 'same', title: 'Same', startsAt: '2026-12-05T12:00:00Z', minPriceCents: 10, seatsLeft: 1, order: 2 },
+      ];
+      assert.deepEqual(sortEvents(equalKeyEvents).map((event) => event.order), [1, 2]);
+    });
+
+    it('orders equivalent instants chronologically when ISO offsets differ', () => {
+      const events = [
+        { id: 'later', title: 'Later', startsAt: '2026-12-05T14:00:00+02:00', minPriceCents: 10, seatsLeft: 1 },
+        { id: 'earlier', title: 'Earlier', startsAt: '2026-12-05T11:00:00Z', minPriceCents: 10, seatsLeft: 1 },
+      ];
+      assert.deepEqual(sortEvents(events).map((event) => event.id), ['earlier', 'later']);
     });
   });
 
   it('searchEvents filters then sorts', () => {
     const result = searchEvents(summaries, { city: 'Lagos' }, 'price');
     assert.deepEqual(titles(result), ['Food Fair', 'Jazz Night']);
+  });
+
+  it('filtering returns a new list without changing the original', () => {
+    const input = structuredClone(summaries);
+    const snapshot = structuredClone(input);
+    const filtered = filterEvents(input, { city: 'lagos' });
+    assert.deepEqual(input, snapshot);
+    assert.notEqual(filtered, input);
   });
 });
