@@ -41,8 +41,11 @@ describe('inventory', () => {
     it('rejects a missing title, a bad date and bad numbers', () => {
       throwsCode(() => createEvent(store, { title: ' ', city: 'x', startsAt: '2026-12-05' }), 'VALIDATION');
       throwsCode(() => createEvent(store, { title: 'x', city: 'x', startsAt: 'nope' }), 'VALIDATION');
+      throwsCode(() => createEvent(store, null), 'VALIDATION');
       throwsCode(() => addTier(store, event.id, { name: 'x', priceCents: 19.99, capacity: 5 }), 'VALIDATION');
       throwsCode(() => addTier(store, event.id, { name: 'x', priceCents: 100, capacity: 0 }), 'VALIDATION');
+      throwsCode(() => addTier(store, event.id, null), 'VALIDATION');
+      throwsCode(() => addTier({}, event.id, { name: 'x', priceCents: 100, capacity: 5 }), 'VALIDATION');
     });
 
     it('cannot publish an event with no tiers', () => {
@@ -62,8 +65,12 @@ describe('inventory', () => {
 
     it('rejects a booking bigger than the seats left, and changes nothing', () => {
       bookTickets(store, tier.id, 'ada', 2);
+      const bookingCount = store.bookings.size;
+      const referenceCount = store.bookingsByReference.size;
       throwsCode(() => bookTickets(store, tier.id, 'bayo', 2), 'SOLD_OUT');
       assert.equal(seatsLeft(tier), 1);
+      assert.equal(store.bookings.size, bookingCount);
+      assert.equal(store.bookingsByReference.size, referenceCount);
     });
 
     it('lets the last ticket be booked, then reports sold out', () => {
@@ -76,13 +83,16 @@ describe('inventory', () => {
       for (const bad of [0, -1, 1.5, 11, '2', undefined]) {
         throwsCode(() => bookTickets(store, tier.id, 'ada', bad), 'VALIDATION');
       }
+      throwsCode(() => bookTickets(store, tier.id, ' ', 1), 'VALIDATION');
     });
 
     it('finds a booking by its reference code', () => {
       const booking = bookTickets(store, tier.id, 'ada', 1);
-      assert.match(booking.reference, /^[A-Z2-9]{8}$/);
+      assert.match(booking.reference, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/);
       assert.equal(findBookingByReference(store, booking.reference), booking);
+      assert.equal(findBookingByReference(store, ` ${booking.reference} `), booking);
       assert.equal(findBookingByReference(store, 'NOPE0000'), undefined);
+      throwsCode(() => findBookingByReference(store, ' '), 'VALIDATION');
     });
   });
 
@@ -108,6 +118,7 @@ describe('inventory', () => {
       bookTickets(store, tier.id, 'bayo', 3);
       assert.deepEqual(joinWaitlist(store, tier.id, 'ada', 1), { position: 1 });
       assert.deepEqual(joinWaitlist(store, tier.id, 'chidi', 1), { position: 2 });
+      throwsCode(() => joinWaitlist(store, tier.id, ' ', 1), 'VALIDATION');
     });
 
     it('offers seats first come, first served', () => {

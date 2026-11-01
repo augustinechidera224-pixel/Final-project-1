@@ -47,11 +47,11 @@ attempt('Chidi joins the waitlist for 2 seats', () => joinWaitlist(store, tier.i
 attempt('Dayo joins the waitlist for 1 seat', () => joinWaitlist(store, tier.id, 'dayo', 1));
 
 console.log(`\nLooking Ada's booking up by reference ${ada.reference}:`);
-console.log(findBookingByReference(store, ada.reference));
+console.log(`Found booking for ${findBookingByReference(store, ada.reference).userId}.`);
 
 console.log();
 attempt('Ada cancels', () => cancelBooking(store, ada.reference));
 console.log(`Seats left: ${seatsLeft(tier)}`);
 
 const offer = offerNextOnWaitlist(store, tier.id);
-console.log('Next on the waitlist:', offer);
+console.log('Next on the waitlist:', offer.userId);

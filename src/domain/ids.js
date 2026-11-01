@@ -7,10 +7,9 @@ export function newId() {
   return randomUUID();
 }
 
-// 32 characters divides 256 evenly, so `byte % 32` has no bias.
-// Math.random() would work too, but it is not meant for codes people rely on.
-export function referenceCode(length = 8) {
-  const bytes = randomBytes(length);
+export function newReference() {
+  // The alphabet has 32 characters, so reducing a byte modulo 32 is unbiased.
+  const bytes = randomBytes(8);
   let code = '';
   for (const byte of bytes) {
     code += ALPHABET[byte % ALPHABET.length];
